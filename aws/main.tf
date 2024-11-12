@@ -30,6 +30,57 @@ resource "aws_security_group" "allow_all_ingress" {
   }
 }
 
+# Security Group for RDS
+resource "aws_security_group" "rds_sg" {
+  name        = "rds_security_group"
+  description = "Allow ingress for RDS instance"
+  vpc_id      = var.vpc_id
+
+  # Allow incoming traffic from EC2 instances
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [aws_security_group.allow_all_ingress.cidr_block]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# RDS instance
+resource "aws_db_instance" "main" {
+  allocated_storage    = var.rds_allocated_storage
+  engine               = var.rds_engine
+  engine_version       = var.rds_engine_version
+  instance_class       = var.rds_instance_class
+  name                 = var.rds_name
+  username             = var.rds_username
+  password             = var.rds_password
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]
+  db_subnet_group_name = aws_db_subnet_group.rds_subnet.name
+
+  # Ensures the RDS instance is accessible from within the VPC only
+  publicly_accessible = false
+
+  tags = {
+    Name = "RDS-${var.rds_name}"
+  }
+}
+
+# Subnet group for RDS
+resource "aws_db_subnet_group" "rds_subnet" {
+  name       = "rds_subnet_group"
+  subnet_ids = [var.subnet_id]
+  tags = {
+    Name = "RDS subnet group"
+  }
+}
+
 # Get the subnet information
 data "aws_subnet" "selected_subnet" {
   id = var.subnet_id

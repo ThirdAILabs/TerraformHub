@@ -13,3 +13,11 @@ admin_username = "admin"
 admin_password = "password"
 thirdai_platform_version = "v0.0.82"
 genai_key = ""
+
+rds_instance_class   = "db.t3.micro"
+rds_engine           = "postgres"
+rds_engine_version   = "13.3"
+rds_name             = "mydatabase"
+rds_username         = "admin"
+rds_password         = "mypassword"
+rds_allocated_storage = 20
