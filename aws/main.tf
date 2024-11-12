@@ -118,7 +118,10 @@ chmod 600 /home/ec2-user/.ssh/authorized_keys
 # Install NFS utilities and mount the EFS file system at /opt/thirdai_platform/model_bazaar
 yum install -y amazon-efs-utils
 mkdir -p /opt/thirdai_platform/model_bazaar
-mount -t efs -o tls ${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar
+
+# Add to /etc/fstab to auto-mount EFS after reboot
+echo "${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
+mount -a
 EOF
 }
 
@@ -156,7 +159,10 @@ chmod 600 /home/ec2-user/.ssh/authorized_keys
 # Install NFS utilities and mount the EFS file system at /opt/thirdai_platform/model_bazaar
 yum install -y amazon-efs-utils
 mkdir -p /opt/thirdai_platform/model_bazaar
-mount -t efs -o tls ${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar
+
+# Add to /etc/fstab to auto-mount EFS after reboot
+echo "${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
+mount -a
 
 # Switch to ec2-user for the rest of the script
 cat <<'SCRIPT' | sudo -u ec2-user bash
