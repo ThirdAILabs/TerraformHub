@@ -2,6 +2,30 @@ provider "aws" {
   region = var.aws_region
 }
 
+# Create an EFS file system
+resource "aws_efs_file_system" "example" {
+  encrypted = var.efs_encrypted
+
+  # Configure lifecycle policy - OPTIONAL
+  lifecycle_policy {
+    transition_to_ia = var.efs_lifecycle_transition
+  }
+
+  # Performance mode - OPTIONAL
+  performance_mode = var.efs_performance_mode
+
+  # Throughput mode - OPTIONAL
+  throughput_mode = var.efs_throughput_mode
+  
+  # Provisioned throughput - Only if throughput_mode is "provisioned"
+  provisioned_throughput_in_mibps = var.efs_provisioned_throughput
+
+  # Tags
+  tags = {
+    Name = "my-efs"
+  }
+}
+
 # Security Group allowing all ingress traffic from the subnet
 resource "aws_security_group" "allow_all_ingress" {
   name        = "allow_all_ingress_sg"
@@ -30,9 +54,26 @@ resource "aws_security_group" "allow_all_ingress" {
   }
 }
 
+# Create an EFS mount target in the specified subnet
+resource "aws_efs_mount_target" "example_mount_target" {
+  file_system_id  = aws_efs_file_system.example.id
+  subnet_id       = var.subnet_id
+  security_groups = [aws_security_group.allow_all_ingress.id]
+}
+
 # Get the subnet information
 data "aws_subnet" "selected_subnet" {
   id = var.subnet_id
+}
+
+# Add an ingress rule for EFS access on NFS port 2049
+resource "aws_security_group_rule" "allow_efs_access" {
+  type              = "ingress"
+  from_port         = 2049
+  to_port           = 2049
+  protocol          = "tcp"
+  security_group_id = aws_security_group.allow_all_ingress.id
+  cidr_blocks       = [data.aws_subnet.selected_subnet.cidr_block]
 }
 
 # Create an SSH key pair to be used for internal SSH access
@@ -73,6 +114,11 @@ echo '${tls_private_key.instance_key.public_key_openssh}' >> /home/ec2-user/.ssh
 chown -R ec2-user:ec2-user /home/ec2-user/.ssh
 chmod 700 /home/ec2-user/.ssh
 chmod 600 /home/ec2-user/.ssh/authorized_keys
+
+# Install NFS utilities and mount the EFS file system at /opt/thirdai_platform/model_bazaar
+yum install -y amazon-efs-utils
+mkdir -p /opt/thirdai_platform/model_bazaar
+mount -t efs -o tls ${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar
 EOF
 }
 
@@ -106,6 +152,11 @@ echo '${tls_private_key.instance_key.public_key_openssh}' >> /home/ec2-user/.ssh
 chown -R ec2-user:ec2-user /home/ec2-user/.ssh
 chmod 700 /home/ec2-user/.ssh
 chmod 600 /home/ec2-user/.ssh/authorized_keys
+
+# Install NFS utilities and mount the EFS file system at /opt/thirdai_platform/model_bazaar
+yum install -y amazon-efs-utils
+mkdir -p /opt/thirdai_platform/model_bazaar
+mount -t efs -o tls ${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar
 
 # Switch to ec2-user for the rest of the script
 cat <<'SCRIPT' | sudo -u ec2-user bash

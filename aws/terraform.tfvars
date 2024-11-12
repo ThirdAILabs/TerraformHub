@@ -13,3 +13,9 @@ admin_username = "admin"
 admin_password = "password"
 thirdai_platform_version = "v0.0.82"
 genai_key = ""
+
+efs_encrypted               = true
+efs_lifecycle_transition    = "AFTER_30_DAYS"
+efs_performance_mode        = "generalPurpose"
+efs_throughput_mode         = "bursting"
+efs_provisioned_throughput  = 10 # Only used if efs_throughput_mode is "provisioned"
