@@ -133,14 +133,21 @@ resource "aws_instance" "ec2_instances" {
   # User data to add public key to authorized keys
   user_data = <<EOF
 #!/bin/bash
-mkdir -p /home/ec2-user/.ssh
-echo '${tls_private_key.instance_key.public_key_openssh}' >> /home/ec2-user/.ssh/authorized_keys
-chown -R ec2-user:ec2-user /home/ec2-user/.ssh
-chmod 700 /home/ec2-user/.ssh
-chmod 600 /home/ec2-user/.ssh/authorized_keys
+mkdir -p /home/${var.default_username}/.ssh
+echo '${tls_private_key.instance_key.public_key_openssh}' >> /home/${var.default_username}/.ssh/authorized_keys
+chown -R ${var.default_username}:${var.default_username} /home/${var.default_username}/.ssh
+chmod 700 /home/${var.default_username}/.ssh
+chmod 600 /home/${var.default_username}/.ssh/authorized_keys
 
 # Install NFS utilities and mount the EFS file system at /opt/thirdai_platform/model_bazaar
-yum install -y amazon-efs-utils
+
+# Determine package manager and install necessary NFS utilities
+if [ "${var.default_username}" == "ubuntu" ]; then
+  apt install -y nfs-common
+else
+  yum install -y amazon-efs-utils nfs-utils
+fi
+
 mkdir -p /opt/thirdai_platform/model_bazaar
 
 # Wait for EFS DNS resolution
@@ -155,7 +162,12 @@ do
   mount_ip=$(dig +short $mount_dns)
 done
 
-mount -t efs -o tls ${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar
+# Use NFS mount for EFS on Ubuntu if amazon-efs-utils is not available
+if [ "${var.default_username}" == "ubuntu" ]; then
+  mount -t nfs4 -o nfsvers=4.1 ${aws_efs_file_system.example.id}.efs.${var.aws_region}.amazonaws.com:/ /opt/thirdai_platform/model_bazaar
+else
+  mount -t efs -o tls ${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar
+fi
 
 # Add to /etc/fstab to auto-mount EFS after reboot
 echo "${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
@@ -181,20 +193,27 @@ resource "aws_instance" "last_node" {
 
   user_data = <<EOF
 #!/bin/bash
-mkdir -p /home/ec2-user/.ssh
+mkdir -p /home/${var.default_username}/.ssh
 
 # Add private key and public key to last node
-echo '${tls_private_key.instance_key.private_key_pem}' > /home/ec2-user/.ssh/id_rsa
-chmod 600 /home/ec2-user/.ssh/id_rsa
-echo '${tls_private_key.instance_key.public_key_openssh}' > /home/ec2-user/.ssh/id_rsa.pub
-chmod 644 /home/ec2-user/.ssh/id_rsa.pub
-echo '${tls_private_key.instance_key.public_key_openssh}' >> /home/ec2-user/.ssh/authorized_keys
-chown -R ec2-user:ec2-user /home/ec2-user/.ssh
-chmod 700 /home/ec2-user/.ssh
-chmod 600 /home/ec2-user/.ssh/authorized_keys
+echo '${tls_private_key.instance_key.private_key_pem}' > /home/${var.default_username}/.ssh/id_rsa
+chmod 600 /home/${var.default_username}/.ssh/id_rsa
+echo '${tls_private_key.instance_key.public_key_openssh}' > /home/${var.default_username}/.ssh/id_rsa.pub
+chmod 644 /home/${var.default_username}/.ssh/id_rsa.pub
+echo '${tls_private_key.instance_key.public_key_openssh}' >> /home/${var.default_username}/.ssh/authorized_keys
+chown -R ${var.default_username}:${var.default_username} /home/${var.default_username}/.ssh
+chmod 700 /home/${var.default_username}/.ssh
+chmod 600 /home/${var.default_username}/.ssh/authorized_keys
 
 # Install NFS utilities and mount the EFS file system at /opt/thirdai_platform/model_bazaar
-yum install -y amazon-efs-utils
+
+# Determine package manager and install necessary NFS utilities
+if [ "${var.default_username}" == "ubuntu" ]; then
+  apt install -y nfs-common
+else
+  yum install -y amazon-efs-utils nfs-utils
+fi
+
 mkdir -p /opt/thirdai_platform/model_bazaar
 
 # Wait for EFS DNS resolution
@@ -209,19 +228,24 @@ do
   mount_ip=$(dig +short $mount_dns)
 done
 
-mount -t efs -o tls ${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar
+# Use NFS mount for EFS on Ubuntu if amazon-efs-utils is not available
+if [ "${var.default_username}" == "ubuntu" ]; then
+  mount -t nfs4 -o nfsvers=4.1 ${aws_efs_file_system.example.id}.efs.${var.aws_region}.amazonaws.com:/ /opt/thirdai_platform/model_bazaar
+else
+  mount -t efs -o tls ${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar
+fi
 
 # Add to /etc/fstab to auto-mount EFS after reboot
 echo "${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
 
-# Switch to ec2-user for the rest of the script
-cat <<'SCRIPT' | sudo -u ec2-user bash
+# Switch to ${var.default_username} for the rest of the script
+cat <<'SCRIPT' | sudo -u ${var.default_username} bash
 cd ~
 wget https://thirdai-corp-public.s3.us-east-2.amazonaws.com/ThirdAI-Platform-latest-release/thirdai-platform-package-release-test-main-v0.0.82.tar.gz
 tar -xvzf thirdai-platform-package-release-test-main-v0.0.82.tar.gz
 
 # Create ndb_enterprise_license.json file from local text
-cat <<EOL > /home/ec2-user/ndb_enterprise_license.json
+cat <<EOL > /home/${var.default_username}/ndb_enterprise_license.json
 ${file(var.license_file_path)}
 EOL
 
@@ -240,7 +264,7 @@ echo "Public IP: $last_node_public_ip"
 
 sed -i '/- name: \"node2\"/,$d' config.yml
 
-sed -i 's|license_path:.*|license_path: \"/home/ec2-user/ndb_enterprise_license.json\"|' config.yml
+sed -i 's|license_path:.*|license_path: \"/home/${var.default_username}/ndb_enterprise_license.json\"|' config.yml
 sed -i 's|admin_mail:.*|admin_mail: \"${var.admin_mail}\"|' config.yml
 sed -i 's|admin_username:.*|admin_username: \"${var.admin_username}\"|' config.yml
 sed -i 's|admin_password:.*|admin_password: \"${var.admin_password}\"|' config.yml
@@ -251,7 +275,7 @@ sed -i 's|create_nfs_server:.*|create_nfs_server: false|' config.yml
 
 sed -i "s|public_ip:.*|public_ip: \"$${last_node_public_ip}\"|" config.yml
 sed -i "s|private_ip:.*|private_ip: \"$${last_node_private_ip}\"|" config.yml
-sed -i 's|ssh_username:.*|ssh_username: \"ec2-user\"|' config.yml
+sed -i 's|ssh_username:.*|ssh_username: \"${var.default_username}\"|' config.yml
 
 sed -i '/connection_type:/,/# in which case Ansible will install all libraries directly on the local host without using SSH/{d}' config.yml
 sed -i '/ssh_username:/a \    connection_type: \"local\"' config.yml
@@ -261,7 +285,7 @@ IFS=',' read -r -a private_ips <<< "$nodes_private_ips"
 for i in $(seq 0 $(($${#private_ips[@]} - 1))); do
     echo "  - name: \"node$((i + 2))\"" >> config.yml
     echo "    private_ip: \"$${private_ips[$i]}\"" >> config.yml
-    echo "    ssh_username: \"ec2-user\"" >> config.yml
+    echo "    ssh_username: \"${var.default_username}\"" >> config.yml
     echo "    connection_type: \"ssh\"" >> config.yml
     echo "    private_key: \"\"" >> config.yml
     echo "    ssh_common_args: \"\"" >> config.yml

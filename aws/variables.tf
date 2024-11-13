@@ -23,6 +23,11 @@ variable "instance_type" {
   type        = string
 }
 
+variable "default_username" {
+  description = "Default username for SSH and directory setup based on the AMI (e.g., 'ec2-user' for Amazon Linux, 'ubuntu' for Ubuntu)"
+  type        = string
+}
+
 variable "disk_size" {
   description = "The size of the root volume in GB"
   type        = number

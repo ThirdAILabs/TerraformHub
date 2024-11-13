@@ -2,6 +2,7 @@ aws_region     = "us-east-1"
 vpc_id         = "vpc-id"
 subnet_id      = "subnet-id"
 ami_id         = "ami-id"
+default_username = "ubuntu"  # Use "ec2-user" for Amazon Linux, "ubuntu" for Ubuntu, "centos" for CentOS, etc.
 instance_type  = "c5.4xlarge"
 disk_size      = 100
 instance_count = 2
