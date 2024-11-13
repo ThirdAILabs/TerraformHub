@@ -2,32 +2,18 @@ provider "aws" {
   region = var.aws_region
 }
 
-# Create an EFS file system
-resource "aws_efs_file_system" "example" {
-  encrypted = var.efs_encrypted
-
-  # Configure lifecycle policy - OPTIONAL
-  lifecycle_policy {
-    transition_to_ia = var.efs_lifecycle_transition
+# Attempt to fetch the existing Security Group by name
+data "aws_security_group" "existing_allow_all_ingress" {
+  filter {
+    name   = "group-name"
+    values = ["allow_all_ingress_sg"]
   }
-
-  # Performance mode - OPTIONAL
-  performance_mode = var.efs_performance_mode
-
-  # Throughput mode - OPTIONAL
-  throughput_mode = var.efs_throughput_mode
-  
-  # Provisioned throughput - Only if throughput_mode is "provisioned"
-  provisioned_throughput_in_mibps = var.efs_provisioned_throughput
-
-  # Tags
-  tags = {
-    Name = "my-efs"
-  }
+  vpc_id = var.vpc_id
 }
 
-# Security Group allowing all ingress traffic from the subnet
+# Conditionally create Security Group if it doesn't exist
 resource "aws_security_group" "allow_all_ingress" {
+  count       = try(data.aws_security_group.existing_allow_all_ingress.id, null) == null ? 1 : 0
   name        = "allow_all_ingress_sg"
   description = "Security group that allows all ingress traffic from the subnet"
   vpc_id      = var.vpc_id
@@ -54,11 +40,43 @@ resource "aws_security_group" "allow_all_ingress" {
   }
 }
 
+# Create an EFS file system
+resource "aws_efs_file_system" "example" {
+  encrypted = var.efs_encrypted
+
+  # Configure lifecycle policy - OPTIONAL
+  lifecycle_policy {
+    transition_to_ia = var.efs_lifecycle_transition
+  }
+
+  # Performance mode - OPTIONAL
+  performance_mode = var.efs_performance_mode
+
+  # Throughput mode - OPTIONAL
+  throughput_mode = var.efs_throughput_mode
+  
+  # Provisioned throughput - Only if throughput_mode is "provisioned"
+  provisioned_throughput_in_mibps = var.efs_provisioned_throughput
+
+  # Tags
+  tags = {
+    Name = "my-efs"
+  }
+
+  # Ignore changes to throughput settings to avoid unnecessary updates
+  lifecycle {
+    ignore_changes = [
+      throughput_mode,
+      provisioned_throughput_in_mibps
+    ]
+  }
+}
+
 # Create an EFS mount target in the specified subnet
 resource "aws_efs_mount_target" "example_mount_target" {
   file_system_id  = aws_efs_file_system.example.id
   subnet_id       = var.subnet_id
-  security_groups = [aws_security_group.allow_all_ingress.id]
+  security_groups = [try(data.aws_security_group.existing_allow_all_ingress.id, aws_security_group.allow_all_ingress[0].id)]
 }
 
 # Get the subnet information
@@ -72,19 +90,25 @@ resource "aws_security_group_rule" "allow_efs_access" {
   from_port         = 2049
   to_port           = 2049
   protocol          = "tcp"
-  security_group_id = aws_security_group.allow_all_ingress.id
+  security_group_id = try(data.aws_security_group.existing_allow_all_ingress.id, aws_security_group.allow_all_ingress[0].id)
   cidr_blocks       = [data.aws_subnet.selected_subnet.cidr_block]
 }
 
-# Create an SSH key pair to be used for internal SSH access
+# Attempt to fetch existing Key Pair
+data "aws_key_pair" "existing_key_pair" {
+  key_name = "internal-key"
+}
+
 resource "tls_private_key" "instance_key" {
   algorithm = "RSA"
   rsa_bits  = 2048
 }
 
+# Conditionally create Key Pair if it doesn't exist
 resource "aws_key_pair" "instance_key_pair" {
-  key_name   = "internal-key"
-  public_key = tls_private_key.instance_key.public_key_openssh
+  count       = try(data.aws_key_pair.existing_key_pair.id, null) == null ? 1 : 0
+  key_name    = "internal-key"
+  public_key  = tls_private_key.instance_key.public_key_openssh
 }
 
 # Create (instance_count - 1) EC2 instances
@@ -93,7 +117,7 @@ resource "aws_instance" "ec2_instances" {
   ami           = var.ami_id
   instance_type = var.instance_type
   subnet_id     = var.subnet_id
-  vpc_security_group_ids = [aws_security_group.allow_all_ingress.id]
+  vpc_security_group_ids = [try(data.aws_security_group.existing_allow_all_ingress.id, aws_security_group.allow_all_ingress[0].id)]
 
   root_block_device {
     volume_size = var.disk_size
@@ -104,7 +128,7 @@ resource "aws_instance" "ec2_instances" {
   }
 
   # Add SSH key pair for each instance
-  key_name = aws_key_pair.instance_key_pair.key_name
+  key_name = try(data.aws_key_pair.existing_key_pair.key_name, aws_key_pair.instance_key_pair[0].key_name)
 
   # User data to add public key to authorized keys
   user_data = <<EOF
@@ -119,9 +143,22 @@ chmod 600 /home/ec2-user/.ssh/authorized_keys
 yum install -y amazon-efs-utils
 mkdir -p /opt/thirdai_platform/model_bazaar
 
+# Wait for EFS DNS resolution
+mount_dns="${aws_efs_file_system.example.id}.efs.${var.aws_region}.amazonaws.com"
+mount_ip=$(dig +short $mount_dns)
+
+# Loop until DNS resolution is successful
+while [ "$mount_ip" = "" ]
+do
+  echo "DNS for EFS mount unresolved, retrying in 10 seconds..."
+  sleep 10
+  mount_ip=$(dig +short $mount_dns)
+done
+
+mount -t efs -o tls ${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar
+
 # Add to /etc/fstab to auto-mount EFS after reboot
 echo "${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
-mount -a
 EOF
 }
 
@@ -130,7 +167,7 @@ resource "aws_instance" "last_node" {
   ami           = var.ami_id
   instance_type = var.instance_type
   subnet_id     = var.subnet_id
-  vpc_security_group_ids = [aws_security_group.allow_all_ingress.id]
+  vpc_security_group_ids = [try(data.aws_security_group.existing_allow_all_ingress.id, aws_security_group.allow_all_ingress[0].id)]
 
   root_block_device {
     volume_size = var.disk_size
@@ -160,9 +197,22 @@ chmod 600 /home/ec2-user/.ssh/authorized_keys
 yum install -y amazon-efs-utils
 mkdir -p /opt/thirdai_platform/model_bazaar
 
+# Wait for EFS DNS resolution
+mount_dns="${aws_efs_file_system.example.id}.efs.${var.aws_region}.amazonaws.com"
+mount_ip=$(dig +short $mount_dns)
+
+# Loop until DNS resolution is successful
+while [ "$mount_ip" = "" ]
+do
+  echo "DNS for EFS mount unresolved, retrying in 10 seconds..."
+  sleep 10
+  mount_ip=$(dig +short $mount_dns)
+done
+
+mount -t efs -o tls ${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar
+
 # Add to /etc/fstab to auto-mount EFS after reboot
 echo "${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
-mount -a
 
 # Switch to ec2-user for the rest of the script
 cat <<'SCRIPT' | sudo -u ec2-user bash
@@ -177,12 +227,16 @@ EOL
 
 chmod +x driver.sh
 
-# Fetch the last node's public and private IP addresses from instance metadata
-last_node_private_ip=$(curl -s 'http://169.254.169.254/latest/meta-data/local-ipv4')
-last_node_public_ip=$(curl -s 'http://169.254.169.254/latest/meta-data/public-ipv4')
+# Fetch a session token from the metadata service
+TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
 
-echo $last_node_private_ip
-echo $last_node_public_ip
+# Now retrieve the private and public IPs using the session token
+last_node_private_ip=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/meta-data/local-ipv4")
+last_node_public_ip=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/meta-data/public-ipv4")
+
+# Display the results
+echo "Private IP: $last_node_private_ip"
+echo "Public IP: $last_node_public_ip"
 
 sed -i '/- name: \"node2\"/,$d' config.yml
 
@@ -193,6 +247,7 @@ sed -i 's|admin_password:.*|admin_password: \"${var.admin_password}\"|' config.y
 sed -i 's|thirdai_platform_version:.*|thirdai_platform_version: \"${var.thirdai_platform_version}\"|' config.yml
 sed -i 's|login_method:.*|login_method: \"${var.login_method}\"|' config.yml
 sed -i 's|genai_key:.*|genai_key: \"${var.genai_key}\"|' config.yml
+sed -i 's|create_nfs_server:.*|create_nfs_server: false|' config.yml
 
 sed -i "s|public_ip:.*|public_ip: \"$${last_node_public_ip}\"|" config.yml
 sed -i "s|private_ip:.*|private_ip: \"$${last_node_private_ip}\"|" config.yml
