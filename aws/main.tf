@@ -51,9 +51,11 @@ resource "aws_security_group" "allow_all_ingress" {
 # RDS instance
 resource "aws_db_instance" "main" {
   allocated_storage    = var.rds_allocated_storage
-  engine               = var.rds_engine
-  engine_version       = var.rds_engine_version
+  engine               = "postgres"
+  engine_version       = "14.10"
   instance_class       = var.rds_instance_class
+  db_name              = "modelbazaar"
+  identifier           = "thirdai-platform"
   username             = var.rds_username
   password             = var.rds_password
   vpc_security_group_ids = [try(data.aws_security_group.existing_allow_all_ingress.id, aws_security_group.allow_all_ingress[0].id)]
@@ -63,26 +65,17 @@ resource "aws_db_instance" "main" {
   publicly_accessible = false
 
   tags = {
-    Name = "RDS-${var.rds_name}"
+    Name = "RDS-modelbazaar"
   }
 
-  # Optional provisioner to create the database name after instance creation
-  provisioner "local-exec" {
-    command = <<EOT
-      export PGPASSWORD="${var.rds_password}";
-      until psql -h ${self.endpoint} -U ${var.rds_username} -c "CREATE DATABASE ${var.rds_name};"
-      do
-        echo "Waiting for database to be ready..."
-        sleep 10
-      done
-    EOT
-  }
+  # Skip the final snapshot
+  skip_final_snapshot = true
 }
 
 # Subnet group for RDS
 resource "aws_db_subnet_group" "rds_subnet" {
   name       = "rds_subnet_group"
-  subnet_ids = [var.subnet_id]
+  subnet_ids = [var.subnet_id_1, var.subnet_id_2]
   tags = {
     Name = "RDS subnet group"
   }
@@ -123,13 +116,13 @@ resource "aws_efs_file_system" "example" {
 # Create an EFS mount target in the specified subnet
 resource "aws_efs_mount_target" "example_mount_target" {
   file_system_id  = aws_efs_file_system.example.id
-  subnet_id       = var.subnet_id
+  subnet_id       = var.subnet_id_1
   security_groups = [try(data.aws_security_group.existing_allow_all_ingress.id, aws_security_group.allow_all_ingress[0].id)]
 }
 
 # Get the subnet information
 data "aws_subnet" "selected_subnet" {
-  id = var.subnet_id
+  id = var.subnet_id_1
 }
 
 # Add an ingress rule for EFS access on NFS port 2049
@@ -164,7 +157,7 @@ resource "aws_instance" "ec2_instances" {
   count         = var.instance_count - 1
   ami           = var.ami_id
   instance_type = var.instance_type
-  subnet_id     = var.subnet_id
+  subnet_id     = var.subnet_id_1
   vpc_security_group_ids = [try(data.aws_security_group.existing_allow_all_ingress.id, aws_security_group.allow_all_ingress[0].id)]
 
   root_block_device {
@@ -226,7 +219,7 @@ EOF
 resource "aws_instance" "last_node" {
   ami           = var.ami_id
   instance_type = var.instance_type
-  subnet_id     = var.subnet_id
+  subnet_id     = var.subnet_id_1
   vpc_security_group_ids = [try(data.aws_security_group.existing_allow_all_ingress.id, aws_security_group.allow_all_ingress[0].id)]
 
   root_block_device {
@@ -311,6 +304,14 @@ echo "Private IP: $last_node_private_ip"
 echo "Public IP: $last_node_public_ip"
 
 sed -i '/- name: \"node2\"/,$d' config.yml
+
+# Construct the sql_uri dynamically with endpoint and credentials
+sql_uri="postgresql://${var.rds_username}:${var.rds_password}@${aws_db_instance.main.endpoint}/modelbazaar"
+echo "SQL URI: $sql_uri"
+
+# Update config.yml with self_hosted_sql_server and sql_uri
+sed -i 's|self_hosted_sql_server:.*|self_hosted_sql_server: false|' config.yml
+sed -i "/^nodes:/i sql_uri: \"$${sql_uri}\"" config.yml
 
 sed -i 's|license_path:.*|license_path: \"/home/${var.default_username}/ndb_enterprise_license.json\"|' config.yml
 sed -i 's|admin_mail:.*|admin_mail: \"${var.admin_mail}\"|' config.yml

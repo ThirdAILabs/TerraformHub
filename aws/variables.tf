@@ -8,8 +8,13 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "subnet_id" {
-  description = "The subnet ID to launch the instances in"
+variable "subnet_id_1" {
+  description = "The subnet ID to launch the instances in use for all main purposes"
+  type        = string
+}
+
+variable "subnet_id_2" {
+  description = "The second subnet ID in a different AZ for RDS (mandatory requirement for RDS)"
   type        = string
 }
 
@@ -87,24 +92,6 @@ variable "rds_instance_class" {
   description = "The instance type of the RDS database"
   type        = string
   default     = "db.t3.micro"
-}
-
-variable "rds_engine" {
-  description = "The database engine to use"
-  type        = string
-  default     = "postgres"
-}
-
-variable "rds_engine_version" {
-  description = "The version of the database engine"
-  type        = string
-  default     = "13.3"
-}
-
-variable "rds_name" {
-  description = "The name of the database to create"
-  type        = string
-  default     = "mydatabase"
 }
 
 variable "rds_username" {
