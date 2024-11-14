@@ -18,6 +18,14 @@ resource "aws_security_group" "allow_all_ingress" {
   description = "Security group that allows all ingress traffic from the subnet"
   vpc_id      = var.vpc_id
 
+  # Add RDS Ingress Rule to Allow Internal Communication on Port 5432
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    self            = true
+  }
+
   ingress {
     from_port   = 0
     to_port     = 0
@@ -40,38 +48,15 @@ resource "aws_security_group" "allow_all_ingress" {
   }
 }
 
-# Security Group for RDS
-resource "aws_security_group" "rds_sg" {
-  name        = "rds_security_group"
-  description = "Allow ingress for RDS instance"
-  vpc_id      = var.vpc_id
-
-  # Allow incoming traffic from EC2 instances
-  ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = [aws_security_group.allow_all_ingress.cidr_block]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
 # RDS instance
 resource "aws_db_instance" "main" {
   allocated_storage    = var.rds_allocated_storage
   engine               = var.rds_engine
   engine_version       = var.rds_engine_version
   instance_class       = var.rds_instance_class
-  name                 = var.rds_name
   username             = var.rds_username
   password             = var.rds_password
-  vpc_security_group_ids = [aws_security_group.rds_sg.id]
+  vpc_security_group_ids = [try(data.aws_security_group.existing_allow_all_ingress.id, aws_security_group.allow_all_ingress[0].id)]
   db_subnet_group_name = aws_db_subnet_group.rds_subnet.name
 
   # Ensures the RDS instance is accessible from within the VPC only
@@ -79,6 +64,18 @@ resource "aws_db_instance" "main" {
 
   tags = {
     Name = "RDS-${var.rds_name}"
+  }
+
+  # Optional provisioner to create the database name after instance creation
+  provisioner "local-exec" {
+    command = <<EOT
+      export PGPASSWORD="${var.rds_password}";
+      until psql -h ${self.endpoint} -U ${var.rds_username} -c "CREATE DATABASE ${var.rds_name};"
+      do
+        echo "Waiting for database to be ready..."
+        sleep 10
+      done
+    EOT
   }
 }
 
