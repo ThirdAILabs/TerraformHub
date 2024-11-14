@@ -23,6 +23,11 @@ variable "instance_type" {
   type        = string
 }
 
+variable "default_username" {
+  description = "Default username for SSH and directory setup based on the AMI (e.g., 'ec2-user' for Amazon Linux, 'ubuntu' for Ubuntu)"
+  type        = string
+}
+
 variable "disk_size" {
   description = "The size of the root volume in GB"
   type        = number
@@ -118,4 +123,40 @@ variable "rds_allocated_storage" {
   description = "The allocated storage in GBs for the RDS instance"
   type        = number
   default     = 20
+}
+
+# Variables for EFS (Elastic File System)
+# Enable encryption at rest
+variable "efs_encrypted" {
+  description = "Enable encryption for the EFS file system"
+  type        = bool
+  default     = true
+}
+
+# Lifecycle policy transition to Infrequent Access
+variable "efs_lifecycle_transition" {
+  description = "Set lifecycle policy for transition to Infrequent Access storage"
+  type        = string
+  default     = "AFTER_30_DAYS" # Options: "AFTER_7_DAYS", "AFTER_14_DAYS", "AFTER_30_DAYS", "AFTER_60_DAYS", "AFTER_90_DAYS", "NONE"
+}
+
+# Performance mode for the EFS file system
+variable "efs_performance_mode" {
+  description = "Performance mode of the EFS file system"
+  type        = string
+  default     = "generalPurpose" # Options: "generalPurpose", "maxIO"
+}
+
+# Throughput mode for the EFS file system
+variable "efs_throughput_mode" {
+  description = "Throughput mode of the EFS file system"
+  type        = string
+  default     = "bursting" # Options: "bursting", "provisioned"
+}
+
+# Provisioned throughput in MiB/s (only applicable if throughput_mode is 'provisioned')
+variable "efs_provisioned_throughput" {
+  description = "Provisioned throughput for the EFS file system in MiB/s"
+  type        = number
+  default     = 10 # Only applicable if throughput_mode is "provisioned"
 }

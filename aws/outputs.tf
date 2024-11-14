@@ -46,3 +46,8 @@ output "rds_password" {
   value     = var.rds_password
   sensitive = true
 }
+
+output "efs_id" {
+  description = "The ID of the created EFS file system"
+  value       = aws_efs_file_system.example.id
+}

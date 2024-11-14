@@ -2,6 +2,7 @@ aws_region     = "us-east-1"
 vpc_id         = "vpc-id"
 subnet_id      = "subnet-id"
 ami_id         = "ami-id"
+default_username = "ubuntu"  # Use "ec2-user" for Amazon Linux, "ubuntu" for Ubuntu, "centos" for CentOS, etc.
 instance_type  = "c5.4xlarge"
 disk_size      = 100
 instance_count = 2
@@ -21,3 +22,9 @@ rds_name             = "mydatabase"
 rds_username         = "admin"
 rds_password         = "mypassword"
 rds_allocated_storage = 20
+
+efs_encrypted               = true
+efs_lifecycle_transition    = "AFTER_30_DAYS"
+efs_performance_mode        = "generalPurpose"
+efs_throughput_mode         = "bursting"
+efs_provisioned_throughput  = 10 # Only used if efs_throughput_mode is "provisioned"
