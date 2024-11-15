@@ -147,3 +147,29 @@ variable "efs_provisioned_throughput" {
   type        = number
   default     = 10 # Only applicable if throughput_mode is "provisioned"
 }
+
+# Add variables to specify existing EFS ID and RDS endpoint
+variable "existing_efs_id" {
+  description = "ID of the existing EFS to use (optional). If provided, EFS creation is skipped."
+  type        = string
+  default     = ""
+}
+
+variable "existing_rds_endpoint" {
+  description = "Endpoint of the existing RDS instance to use (optional). If provided, RDS creation is skipped."
+  type        = string
+  default     = ""
+}
+
+variable "existing_rds_username" {
+  description = "Username of the existing RDS instance (required if using existing RDS)."
+  type        = string
+  default     = ""
+}
+
+variable "existing_rds_password" {
+  description = "Password of the existing RDS instance (required if using existing RDS)."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

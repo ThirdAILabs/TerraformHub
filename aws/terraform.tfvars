@@ -25,3 +25,8 @@ efs_lifecycle_transition    = "AFTER_30_DAYS"
 efs_performance_mode        = "generalPurpose"
 efs_throughput_mode         = "bursting"
 efs_provisioned_throughput  = 10 # Only used if efs_throughput_mode is "provisioned"
+
+existing_efs_id          = ""
+existing_rds_endpoint    = ""
+existing_rds_username    = "myadmin"
+existing_rds_password    = "mypassword"

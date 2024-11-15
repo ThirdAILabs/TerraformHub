@@ -50,6 +50,7 @@ resource "aws_security_group" "allow_all_ingress" {
 
 # RDS instance
 resource "aws_db_instance" "main" {
+  count                = var.existing_rds_endpoint != "" ? 0 : 1
   allocated_storage    = var.rds_allocated_storage
   engine               = "postgres"
   engine_version       = "14.10"
@@ -81,8 +82,16 @@ resource "aws_db_subnet_group" "rds_subnet" {
   }
 }
 
+# Use the existing RDS endpoint if provided; otherwise, use the newly created one
+locals {
+  rds_endpoint = var.existing_rds_endpoint != "" ? var.existing_rds_endpoint : aws_db_instance.main[0].endpoint
+  rds_username = var.existing_rds_endpoint != "" ? var.existing_rds_username : var.rds_username
+  rds_password = var.existing_rds_endpoint != "" ? var.existing_rds_password : var.rds_password
+}
+
 # Create an EFS file system
 resource "aws_efs_file_system" "example" {
+  count     = var.existing_efs_id != "" ? 0 : 1
   encrypted = var.efs_encrypted
 
   # Configure lifecycle policy - OPTIONAL
@@ -113,9 +122,14 @@ resource "aws_efs_file_system" "example" {
   }
 }
 
+# Use the existing EFS ID if provided; otherwise, use the newly created one
+locals {
+  efs_id = var.existing_efs_id != "" ? var.existing_efs_id : aws_efs_file_system.example[0].id
+}
+
 # Create an EFS mount target in the specified subnet
 resource "aws_efs_mount_target" "example_mount_target" {
-  file_system_id  = aws_efs_file_system.example.id
+  file_system_id  = local.efs_id
   subnet_id       = var.subnet_id_1
   security_groups = [try(data.aws_security_group.existing_allow_all_ingress.id, aws_security_group.allow_all_ingress[0].id)]
 }
@@ -192,7 +206,7 @@ fi
 mkdir -p /opt/thirdai_platform/model_bazaar
 
 # Wait for EFS DNS resolution
-mount_dns="${aws_efs_file_system.example.id}.efs.${var.aws_region}.amazonaws.com"
+mount_dns="${local.efs_id}.efs.${var.aws_region}.amazonaws.com"
 mount_ip=$(dig +short $mount_dns)
 
 # Loop until DNS resolution is successful
@@ -205,13 +219,13 @@ done
 
 # Use NFS mount for EFS on Ubuntu if amazon-efs-utils is not available
 if [ "${var.default_username}" == "ubuntu" ]; then
-  mount -t nfs4 -o nfsvers=4.1 ${aws_efs_file_system.example.id}.efs.${var.aws_region}.amazonaws.com:/ /opt/thirdai_platform/model_bazaar
+  mount -t nfs4 -o nfsvers=4.1 ${local.efs_id}.efs.${var.aws_region}.amazonaws.com:/ /opt/thirdai_platform/model_bazaar
 else
-  mount -t efs -o tls ${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar
+  mount -t efs -o tls ${local.efs_id}:/ /opt/thirdai_platform/model_bazaar
 fi
 
 # Add to /etc/fstab to auto-mount EFS after reboot
-echo "${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
+echo "${local.efs_id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
 EOF
 }
 
@@ -258,7 +272,7 @@ fi
 mkdir -p /opt/thirdai_platform/model_bazaar
 
 # Wait for EFS DNS resolution
-mount_dns="${aws_efs_file_system.example.id}.efs.${var.aws_region}.amazonaws.com"
+mount_dns="${local.efs_id}.efs.${var.aws_region}.amazonaws.com"
 mount_ip=$(dig +short $mount_dns)
 
 # Loop until DNS resolution is successful
@@ -271,13 +285,13 @@ done
 
 # Use NFS mount for EFS on Ubuntu if amazon-efs-utils is not available
 if [ "${var.default_username}" == "ubuntu" ]; then
-  mount -t nfs4 -o nfsvers=4.1 ${aws_efs_file_system.example.id}.efs.${var.aws_region}.amazonaws.com:/ /opt/thirdai_platform/model_bazaar
+  mount -t nfs4 -o nfsvers=4.1 ${local.efs_id}.efs.${var.aws_region}.amazonaws.com:/ /opt/thirdai_platform/model_bazaar
 else
-  mount -t efs -o tls ${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar
+  mount -t efs -o tls ${local.efs_id}:/ /opt/thirdai_platform/model_bazaar
 fi
 
 # Add to /etc/fstab to auto-mount EFS after reboot
-echo "${aws_efs_file_system.example.id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
+echo "${local.efs_id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
 
 # Switch to ${var.default_username} for the rest of the script
 cat <<'SCRIPT' | sudo -u ${var.default_username} bash
@@ -306,7 +320,7 @@ echo "Public IP: $last_node_public_ip"
 sed -i '/- name: \"node2\"/,$d' config.yml
 
 # Construct the sql_uri dynamically with endpoint and credentials
-sql_uri="postgresql://${var.rds_username}:${var.rds_password}@${aws_db_instance.main.endpoint}/modelbazaar"
+sql_uri="postgresql://${local.rds_username}:${local.rds_password}@${local.rds_endpoint}/modelbazaar"
 echo "SQL URI: $sql_uri"
 
 # Update config.yml with self_hosted_sql_server and sql_uri

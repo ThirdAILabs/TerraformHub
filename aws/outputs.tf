@@ -35,19 +35,22 @@ output "last_node_public_ip" {
 }
 
 output "rds_endpoint" {
-  value = aws_db_instance.main.endpoint
+  description = "The endpoint of the RDS instance being used"
+  value       = local.rds_endpoint
 }
 
 output "rds_username" {
-  value = var.rds_username
+  description = "The username of the RDS instance being used"
+  value       = local.rds_username
 }
 
 output "rds_password" {
-  value     = var.rds_password
-  sensitive = true
+  description = "The password of the RDS instance being used"
+  value       = local.rds_password
+  sensitive   = true
 }
 
 output "efs_id" {
   description = "The ID of the created EFS file system"
-  value       = aws_efs_file_system.example.id
+  value       = local.efs_id
 }
