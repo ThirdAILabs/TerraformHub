@@ -112,7 +112,39 @@ variable "rds_allocated_storage" {
   default     = 20
 }
 
+variable "rds_backup_retention_period" {
+  description = "The number of days to retain backups for the RDS instance"
+  type        = number
+  default     = 7
+}
+
+variable "rds_backup_window" {
+  description = "Backup window for RDS in UTC (e.g., 07:00-09:00)"
+  type        = string
+  default     = "07:00-09:00"
+}
+
+# Enable or disable storage encryption
+variable "rds_storage_encrypted" {
+  description = "Enable encryption for the RDS instance storage"
+  type        = bool
+  default     = true
+}
+
+# Optional KMS Key ID for encryption
+variable "rds_kms_key_id" {
+  description = "Optional KMS Key ID for RDS encryption and performance insights"
+  type        = string
+  default     = "" # Leave empty if no KMS key is used
+}
+
 # Variables for EFS (Elastic File System)
+variable "efs_backup_enabled" {
+  description = "Enable automatic backups for the EFS file system"
+  type        = bool
+  default     = true
+}
+
 # Enable encryption at rest
 variable "efs_encrypted" {
   description = "Enable encryption for the EFS file system"

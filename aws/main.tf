@@ -65,6 +65,16 @@ resource "aws_db_instance" "main" {
   # Ensures the RDS instance is accessible from within the VPC only
   publicly_accessible = false
 
+  # Configurable storage encryption
+  storage_encrypted = var.rds_storage_encrypted
+
+  # Conditionally include KMS Key ID only if provided
+  kms_key_id        = var.rds_storage_encrypted && var.rds_kms_key_id != "" ? var.rds_kms_key_id : null
+
+  # Automated backups
+  backup_retention_period = var.rds_backup_retention_period
+  backup_window           = var.rds_backup_window
+
   tags = {
     Name = "RDS-modelbazaar"
   }
@@ -132,6 +142,14 @@ resource "aws_efs_mount_target" "example_mount_target" {
   file_system_id  = local.efs_id
   subnet_id       = var.subnet_id_1
   security_groups = [try(data.aws_security_group.existing_allow_all_ingress.id, aws_security_group.allow_all_ingress[0].id)]
+}
+
+resource "aws_efs_backup_policy" "policy" {
+  file_system_id = local.efs_id
+
+  backup_policy {
+    status = var.efs_backup_enabled ? "ENABLED" : "DISABLED"
+  }
 }
 
 # Get the subnet information

@@ -19,7 +19,12 @@ rds_instance_class   = "db.t3.micro"
 rds_username         = "myadmin"
 rds_password         = "mypassword"
 rds_allocated_storage = 20
+rds_storage_encrypted = false  # Set to false to disable encryption
+rds_backup_retention_period = 7
+rds_backup_window           = "07:00-09:00"
+rds_kms_key_id              = ""
 
+efs_backup_enabled          = true
 efs_encrypted               = true
 efs_lifecycle_transition    = "AFTER_30_DAYS"
 efs_performance_mode        = "generalPurpose"
