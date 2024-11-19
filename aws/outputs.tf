@@ -26,11 +26,11 @@ output "public_key" {
 }
 
 # Output the private and public IP of the last node
-output "last_node_private_ip" {
+output "head_node_private_ip" {
   value = aws_instance.last_node.private_ip
 }
 
-output "last_node_public_ip" {
+output "head_node_public_ip" {
   value = aws_instance.last_node.public_ip
 }
 
