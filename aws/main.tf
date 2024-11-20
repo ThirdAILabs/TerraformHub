@@ -26,10 +26,10 @@ resource "aws_security_group" "allow_all_thirdai_platform_ingress" {
 
   # Allow internal communication for RDS on port 5432
   ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    self        = true
+    from_port = 5432
+    to_port   = 5432
+    protocol  = "tcp"
+    self      = true
   }
 
   # Allow all ingress traffic within the subnet
@@ -59,26 +59,26 @@ resource "aws_security_group" "allow_all_thirdai_platform_ingress" {
 
 # RDS Database Instance
 resource "aws_db_instance" "thirdai-platform-main" {
-  count                = var.existing_rds_endpoint != "" ? 0 : 1
-  allocated_storage    = var.rds_storage_size_gb
-  engine               = "postgres"
-  engine_version       = "14.10"
-  instance_class       = var.rds_instance_class
-  db_name              = "modelbazaar"
-  identifier           = "thirdai-platform-${random_string.unique_suffix.result}"
-  username             = var.rds_master_username
-  password             = var.rds_master_password
+  count                  = var.existing_rds_endpoint != "" ? 0 : 1
+  allocated_storage      = var.rds_storage_size_gb
+  engine                 = "postgres"
+  engine_version         = "14.10"
+  instance_class         = var.rds_instance_class
+  db_name                = "modelbazaar"
+  identifier             = "thirdai-platform-${random_string.unique_suffix.result}"
+  username               = var.rds_master_username
+  password               = var.rds_master_password
   vpc_security_group_ids = [aws_security_group.allow_all_thirdai_platform_ingress.id]
-  db_subnet_group_name = aws_db_subnet_group.rds_subnet.name
+  db_subnet_group_name   = aws_db_subnet_group.rds_subnet.name
 
   # Ensures the RDS instance is accessible from within the VPC only
   publicly_accessible = false
 
   # Configurable storage encryption
-  storage_encrypted   = var.rds_encryption_enabled
+  storage_encrypted = var.rds_encryption_enabled
 
   # Conditionally include KMS Key ID only if provided
-  kms_key_id          = var.rds_encryption_enabled && var.rds_kms_key_id != "" ? var.rds_kms_key_id : null
+  kms_key_id = var.rds_encryption_enabled && var.rds_kms_key_id != "" ? var.rds_kms_key_id : null
 
   # Automated backups
   backup_retention_period = var.rds_backup_retention_days
@@ -89,7 +89,7 @@ resource "aws_db_instance" "thirdai-platform-main" {
   }
 
   # Skip the final snapshot
-  skip_final_snapshot = false
+  skip_final_snapshot       = false
   final_snapshot_identifier = "final-snapshot-${var.rds_identifier}-${random_string.unique_suffix.result}" # Define a final snapshot name
 }
 
@@ -119,8 +119,8 @@ resource "aws_efs_file_system" "efs" {
     transition_to_ia = var.efs_lifecycle_policy_transition
   }
 
-  performance_mode = var.efs_performance_mode
-  throughput_mode  = var.efs_throughput_mode
+  performance_mode                = var.efs_performance_mode
+  throughput_mode                 = var.efs_throughput_mode
   provisioned_throughput_in_mibps = var.efs_throughput_mode == "provisioned" ? var.efs_provisioned_throughput_mibps : null
 
   tags = {
@@ -185,10 +185,10 @@ resource "aws_key_pair" "instance_key_pair" {
 
 # Create EC2 Instances
 resource "aws_instance" "ec2_instances" {
-  count         = var.ec2_instance_count - 1
-  ami           = var.ami_id
-  instance_type = var.instance_type
-  subnet_id     = var.primary_subnet_id
+  count                  = var.ec2_instance_count - 1
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  subnet_id              = var.primary_subnet_id
   vpc_security_group_ids = [aws_security_group.allow_all_thirdai_platform_ingress.id]
 
   root_block_device {
@@ -248,9 +248,9 @@ EOF
 
 # User data for the last instance to configure all nodes
 resource "aws_instance" "last_node" {
-  ami           = var.ami_id
-  instance_type = var.instance_type
-  subnet_id     = var.primary_subnet_id
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  subnet_id              = var.primary_subnet_id
   vpc_security_group_ids = [aws_security_group.allow_all_thirdai_platform_ingress.id]
 
   root_block_device {
