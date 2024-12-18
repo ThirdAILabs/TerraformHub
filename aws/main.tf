@@ -279,12 +279,41 @@ chmod 600 /home/${var.default_ssh_user}/.ssh/authorized_keys
 
 # Install NFS utilities and mount the EFS file system at /opt/thirdai_platform/model_bazaar
 
+sleep 60
+
 # Determine package manager and install necessary NFS utilities
 if [ "${var.default_ssh_user}" == "ubuntu" ]; then
-  apt install -y nfs-common
+  apt update
+  apt install -y nfs-common postgresql-client
 else
-  yum install -y amazon-efs-utils nfs-utils
+  yum install -y amazon-efs-utils nfs-utils postgresql
 fi
+
+echo "Testing DNS resolution..." >> /var/log/user_data.log
+rds_host=$(echo "${local.rds_endpoint}" | cut -d':' -f1) # Extract the hostname
+rds_port=$(echo "${local.rds_endpoint}" | cut -d':' -f2) # Extract the port
+
+echo "RDS Host: $rds_host" >> /var/log/user_data.log
+echo "RDS Port: $rds_port" >> /var/log/user_data.log
+
+max_retries=30
+retry_interval=10
+retries=0
+while ! host $rds_host; do
+    if [ $retries -ge $max_retries ]; then
+        echo "DNS resolution for RDS endpoint failed after $((max_retries * retry_interval)) seconds. Exiting." >> /var/log/user_data.log
+        exit 1
+    fi
+    echo "DNS not resolved for $rds_host. Retrying in $retry_interval seconds..." >> /var/log/user_data.log
+    sleep $retry_interval
+    retries=$((retries + 1))
+done
+
+echo "RDS endpoint resolved successfully: $rds_host" >> /var/log/user_data.log
+
+# Create required databases on RDS instance
+PGPASSWORD="${local.rds_password}" psql -h "$rds_host" -U "${local.rds_username}" -d postgres -c "CREATE DATABASE grafana;"
+PGPASSWORD="${local.rds_password}" psql -h "$rds_host" -U "${local.rds_username}" -d postgres -c "CREATE DATABASE keycloak;"
 
 mkdir -p /opt/thirdai_platform/model_bazaar
 
@@ -313,8 +342,8 @@ echo "${local.efs_id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" 
 # Switch to ${var.default_ssh_user} for the rest of the script
 cat <<'SCRIPT' | sudo -u ${var.default_ssh_user} bash
 cd ~
-wget https://thirdai-corp-public.s3.us-east-2.amazonaws.com/ThirdAI-Platform-latest-release/thirdai-platform-package-release-test-main-v0.0.82.tar.gz
-tar -xvzf thirdai-platform-package-release-test-main-v0.0.82.tar.gz
+wget https://thirdai-corp-public.s3.us-east-2.amazonaws.com/ThirdAI-Platform-latest-release/thirdai-platform-package-release-test-main-v1.1.0.tar.gz
+tar -xvzf thirdai-platform-package-release-test-main-v1.1.0.tar.gz
 
 # Create ndb_enterprise_license.json file from local text
 cat <<EOL > /home/${var.default_ssh_user}/ndb_enterprise_license.json
@@ -337,12 +366,15 @@ echo "Public IP: $last_node_public_ip"
 sed -i '/- name: \"node2\"/,$d' config.yml
 
 # Construct the sql_uri dynamically with endpoint and credentials
-sql_uri="postgresql://${local.rds_username}:${local.rds_password}@${local.rds_endpoint}/modelbazaar"
-echo "SQL URI: $sql_uri"
+modelbazaar_db_uri="postgresql://${local.rds_username}:${local.rds_password}@${local.rds_endpoint}/modelbazaar"
+keycloak_db_uri="postgresql://${local.rds_username}:${local.rds_password}@${local.rds_endpoint}/keycloak"
+grafana_db_uri="postgres://${local.rds_username}:${local.rds_password}@${local.rds_endpoint}/grafana?sslmode=require"
+echo "MODEL BAZAAR SQL URI: $modelbazaar_db_uri"
+echo "KEYCLOAK SQL URI: $keycloak_db_uri"
+echo "GRAFANA SQL URI: $grafana_db_uri"
 
 # Update config.yml with self_hosted_sql_server and sql_uri
 sed -i 's|self_hosted_sql_server:.*|self_hosted_sql_server: false|' config.yml
-sed -i "/^nodes:/i sql_uri: \"$${sql_uri}\"" config.yml
 
 sed -i 's|license_path:.*|license_path: \"/home/${var.default_ssh_user}/ndb_enterprise_license.json\"|' config.yml
 sed -i 's|admin_mail:.*|admin_mail: \"${var.platform_admin_email}\"|' config.yml
@@ -352,8 +384,11 @@ sed -i 's|thirdai_platform_version:.*|thirdai_platform_version: \"${var.platform
 sed -i 's|login_method:.*|login_method: \"${var.user_auth_method}\"|' config.yml
 sed -i 's|genai_key:.*|genai_key: \"${var.openai_api_key}\"|' config.yml
 sed -i 's|create_nfs_server:.*|create_nfs_server: false|' config.yml
+sed -i "s|cluster_endpoint:.*|cluster_endpoint: \"$${last_node_public_ip}\"|" config.yml
+sed -i "s|external_modelbazaar_db_uri:.*|external_modelbazaar_db_uri: \"$${modelbazaar_db_uri}\"|" config.yml
+sed -i "s|external_keycloak_db_uri:.*|external_keycloak_db_uri: \"$${keycloak_db_uri}\"|" config.yml
+sed -i "s|external_grafana_db_uri:.*|external_grafana_db_uri: \"$${grafana_db_uri}\"|" config.yml
 
-sed -i "s|public_ip:.*|public_ip: \"$${last_node_public_ip}\"|" config.yml
 sed -i "s|private_ip:.*|private_ip: \"$${last_node_private_ip}\"|" config.yml
 sed -i 's|ssh_username:.*|ssh_username: \"${var.default_ssh_user}\"|' config.yml
 
@@ -369,7 +404,12 @@ for i in $(seq 0 $(($${#private_ips[@]} - 1))); do
     echo "    connection_type: \"ssh\"" >> config.yml
     echo "    private_key: \"\"" >> config.yml
     echo "    ssh_common_args: \"\"" >> config.yml
-    echo "    roles: []" >> config.yml
+    if [ $(($${#private_ips[@]} % 2)) -eq 0 ] || [ $i -lt $(($${#private_ips[@]} - 1)) ]; then
+        echo "    roles:" >> config.yml
+        echo "      critical_services: true" >> config.yml
+    else
+        echo "    roles: []" >> config.yml
+    fi
 done
 
 ./driver.sh config.yml
