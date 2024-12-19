@@ -286,7 +286,8 @@ if [ "${var.default_ssh_user}" == "ubuntu" ]; then
   apt update
   apt install -y nfs-common postgresql-client
 else
-  yum install -y amazon-efs-utils nfs-utils postgresql
+  amazon-linux-extras enable postgresql14
+  yum install -y amazon-efs-utils nfs-utils postgresql postgresql-server
 fi
 
 echo "Testing DNS resolution..." >> /var/log/user_data.log
