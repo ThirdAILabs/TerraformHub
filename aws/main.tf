@@ -405,11 +405,14 @@ for i in $(seq 0 $(($${#private_ips[@]} - 1))); do
     echo "    connection_type: \"ssh\"" >> config.yml
     echo "    private_key: \"\"" >> config.yml
     echo "    ssh_common_args: \"\"" >> config.yml
+    # Assign roles to nodes:
+    # - If there is an even number of nodes or this is not the last node, assign 'critical_services: true'.
+    # - The last node in an odd-numbered cluster will have an empty roles array.
     if [ $(($${#private_ips[@]} % 2)) -eq 0 ] || [ $i -lt $(($${#private_ips[@]} - 1)) ]; then
         echo "    roles:" >> config.yml
         echo "      critical_services: true" >> config.yml
     else
-        echo "    roles: []" >> config.yml
+        echo "    roles: {}" >> config.yml
     fi
 done
 
