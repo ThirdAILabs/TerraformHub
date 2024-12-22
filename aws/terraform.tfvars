@@ -9,7 +9,7 @@ ami_id              = "ami-id"
 default_ssh_user    = "ubuntu" # Use "ec2-user" for Amazon Linux, "ubuntu" for Ubuntu
 instance_type       = "c5.4xlarge"
 root_volume_size_gb = 100
-ec2_instance_count  = 2
+ec2_instance_count  = 3
 ssh_key_name        = "thirdai-platform-test-key"
 
 # Licensing
@@ -19,7 +19,7 @@ license_file_path = "/path/to/ndb_enterprise_license.json"
 platform_admin_email    = "admin@thirdai.com"
 platform_admin_username = "admin"
 platform_admin_password = "password"
-platform_version        = "v0.0.82"
+platform_version        = "v1.1.0"
 openai_api_key          = "" # Leave blank if not using OpenAI integration
 
 # RDS Configuration
