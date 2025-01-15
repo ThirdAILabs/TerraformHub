@@ -62,7 +62,7 @@ resource "aws_db_instance" "thirdai-platform-main" {
   count                  = var.existing_rds_endpoint != "" ? 0 : 1
   allocated_storage      = var.rds_storage_size_gb
   engine                 = "postgres"
-  engine_version         = "14.10"
+  engine_version         = "14.12"
   instance_class         = var.rds_instance_class
   db_name                = "modelbazaar"
   identifier             = "thirdai-platform-${random_string.unique_suffix.result}"
@@ -243,6 +243,29 @@ fi
 
 # Add to /etc/fstab to auto-mount EFS after reboot
 echo "${local.efs_id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
+
+# Define the base directory and backup directory pattern
+BASE_DIR="/opt/thirdai_platform/model_bazaar"
+BACKUP_PATTERN="${BASE_DIR}/aws-backup-restore_*"
+
+# Check if a backup directory exists
+BACKUP_DIR=$(find "$BASE_DIR" -maxdepth 1 -type d -name "aws-backup-restore_*" | head -n 1)
+
+if [ -n "$BACKUP_DIR" ]; then
+  echo "Backup directory found: $BACKUP_DIR"
+  
+  # Move the contents of the backup directory to the base directory
+  echo "Unpacking backup..."
+  rsync -a --remove-source-files "$BACKUP_DIR/" "$BASE_DIR/"
+  
+  # Remove the backup directory if it's empty
+  rmdir "$BACKUP_DIR" 2>/dev/null
+  
+  echo "Backup unpacked successfully."
+else
+  echo "No backup directory found."
+fi
+
 EOF
 }
 
@@ -343,8 +366,8 @@ echo "${local.efs_id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" 
 # Switch to ${var.default_ssh_user} for the rest of the script
 cat <<'SCRIPT' | sudo -u ${var.default_ssh_user} bash
 cd ~
-wget https://thirdai-corp-public.s3.us-east-2.amazonaws.com/ThirdAI-Platform-latest-release/thirdai-platform-package-release-test-main-v1.1.0.tar.gz
-tar -xvzf thirdai-platform-package-release-test-main-v1.1.0.tar.gz
+wget https://thirdai-corp-public.s3.us-east-2.amazonaws.com/ThirdAI-Platform-latest-release/thirdai-platform-package-release-test-main-v2.0.0.tar.gz
+tar -xvzf thirdai-platform-package-release-test-main-v2.0.0.tar.gz
 
 # Create ndb_enterprise_license.json file from local text
 cat <<EOL > /home/${var.default_ssh_user}/ndb_enterprise_license.json
