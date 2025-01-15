@@ -19,7 +19,7 @@ license_file_path = "/path/to/ndb_enterprise_license.json"
 platform_admin_email    = "admin@thirdai.com"
 platform_admin_username = "admin"
 platform_admin_password = "password"
-platform_version        = "v1.1.0"
+platform_version        = "v2.0.0"
 openai_api_key          = "" # Leave blank if not using OpenAI integration
 
 # RDS Configuration
