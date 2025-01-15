@@ -246,20 +246,20 @@ echo "${local.efs_id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" 
 
 # Define the base directory and backup directory pattern
 BASE_DIR="/opt/thirdai_platform/model_bazaar"
-BACKUP_PATTERN="${BASE_DIR}/aws-backup-restore_*"
+BACKUP_PATTERN="$${BASE_DIR}/aws-backup-restore_*"
 
 # Check if a backup directory exists
-BACKUP_DIR=$(find "$BASE_DIR" -maxdepth 1 -type d -name "aws-backup-restore_*" | head -n 1)
+BACKUP_DIR=$(find "$$BASE_DIR" -maxdepth 1 -type d -name "aws-backup-restore_*" | head -n 1)
 
-if [ -n "$BACKUP_DIR" ]; then
-  echo "Backup directory found: $BACKUP_DIR"
+if [ -n "$$BACKUP_DIR" ]; then
+  echo "Backup directory found: $$BACKUP_DIR"
   
   # Move the contents of the backup directory to the base directory
   echo "Unpacking backup..."
-  rsync -a --remove-source-files "$BACKUP_DIR/" "$BASE_DIR/"
+  rsync -a --remove-source-files "$$BACKUP_DIR/" "$$BASE_DIR/"
   
   # Remove the backup directory if it's empty
-  rmdir "$BACKUP_DIR" 2>/dev/null
+  rmdir "$$BACKUP_DIR" 2>/dev/null
   
   echo "Backup unpacked successfully."
 else
