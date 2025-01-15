@@ -356,12 +356,11 @@ done
 # Use NFS mount for EFS on Ubuntu if amazon-efs-utils is not available
 if [ "${var.default_ssh_user}" == "ubuntu" ]; then
   mount -t nfs4 -o nfsvers=4.1 ${local.efs_id}.efs.${var.aws_region}.amazonaws.com:/ /opt/thirdai_platform/model_bazaar
+  echo "${local.efs_id}.efs.${var.aws_region}.amazonaws.com:/ /opt/thirdai_platform/model_bazaar nfs4 _netdev,nfsvers=4.1,hard,timeo=600,retrans=2 0 0" >> /etc/fstab
 else
   mount -t efs -o tls ${local.efs_id}:/ /opt/thirdai_platform/model_bazaar
+  echo "${local.efs_id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
 fi
-
-# Add to /etc/fstab to auto-mount EFS after reboot
-echo "${local.efs_id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
 
 # Switch to ${var.default_ssh_user} for the rest of the script
 cat <<'SCRIPT' | sudo -u ${var.default_ssh_user} bash
