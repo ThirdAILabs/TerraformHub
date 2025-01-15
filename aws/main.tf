@@ -237,12 +237,11 @@ done
 # Use NFS mount for EFS on Ubuntu if amazon-efs-utils is not available
 if [ "${var.default_ssh_user}" == "ubuntu" ]; then
   mount -t nfs4 -o nfsvers=4.1 ${local.efs_id}.efs.${var.aws_region}.amazonaws.com:/ /opt/thirdai_platform/model_bazaar
+  echo "${local.efs_id}.efs.${var.aws_region}.amazonaws.com:/ /opt/thirdai_platform/model_bazaar nfs4 _netdev,nfsvers=4.1,hard,timeo=600,retrans=2 0 0" >> /etc/fstab
 else
   mount -t efs -o tls ${local.efs_id}:/ /opt/thirdai_platform/model_bazaar
+  echo "${local.efs_id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
 fi
-
-# Add to /etc/fstab to auto-mount EFS after reboot
-echo "${local.efs_id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
 
 # Define the base directory and backup directory pattern
 BASE_DIR="/opt/thirdai_platform/model_bazaar"
@@ -360,6 +359,28 @@ if [ "${var.default_ssh_user}" == "ubuntu" ]; then
 else
   mount -t efs -o tls ${local.efs_id}:/ /opt/thirdai_platform/model_bazaar
   echo "${local.efs_id}:/ /opt/thirdai_platform/model_bazaar efs _netdev,tls 0 0" >> /etc/fstab
+fi
+
+# Define the base directory and backup directory pattern
+BASE_DIR="/opt/thirdai_platform/model_bazaar"
+BACKUP_PATTERN="$${BASE_DIR}/aws-backup-restore_*"
+
+# Check if a backup directory exists
+BACKUP_DIR=$(find "$$BASE_DIR" -maxdepth 1 -type d -name "aws-backup-restore_*" | head -n 1)
+
+if [ -n "$$BACKUP_DIR" ]; then
+  echo "Backup directory found: $$BACKUP_DIR"
+  
+  # Move the contents of the backup directory to the base directory
+  echo "Unpacking backup..."
+  rsync -a --remove-source-files "$$BACKUP_DIR/" "$$BASE_DIR/"
+  
+  # Remove the backup directory if it's empty
+  rmdir "$$BACKUP_DIR" 2>/dev/null
+  
+  echo "Backup unpacked successfully."
+else
+  echo "No backup directory found."
 fi
 
 # Switch to ${var.default_ssh_user} for the rest of the script
