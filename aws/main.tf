@@ -453,7 +453,8 @@ for i in $(seq 0 $(($${#private_ips[@]} - 1))); do
     # - The last node in an odd-numbered cluster will have an empty roles array.
     if [ $(($${#private_ips[@]} % 2)) -eq 0 ] || [ $i -lt $(($${#private_ips[@]} - 1)) ]; then
         echo "    roles:" >> config.yml
-        echo "      critical_services: true" >> config.yml
+        echo "      critical_services:" >> config.yml
+        echo "        run_jobs: True" >> config.yml
     else
         echo "    roles: {}" >> config.yml
     fi
