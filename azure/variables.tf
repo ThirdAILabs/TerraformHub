@@ -76,3 +76,40 @@ variable "client_secret" {
   sensitive   = true
 }
 
+variable "platform_admin_email" {
+  description = "Email for the ThirdAI platform admin"
+  type        = string
+}
+
+variable "platform_admin_username" {
+  description = "Username for the ThirdAI platform admin"
+  type        = string
+}
+
+variable "platform_admin_password" {
+  description = "Password for the ThirdAI platform admin"
+  type        = string
+  sensitive   = true
+}
+
+variable "platform_version" {
+  description = "Version of the ThirdAI Platform to deploy"
+  type        = string
+  default     = "2.0.0"
+}
+
+variable "user_auth_method" {
+  description = "Authentication method (e.g., SSO, manual)"
+  type        = string
+}
+
+variable "openai_api_key" {
+  description = "API key for OpenAI integration"
+  type        = string
+  sensitive   = true
+}
+
+variable "license_file_path" {
+  description = "Path to the ThirdAI enterprise license file"
+  type        = string
+}
