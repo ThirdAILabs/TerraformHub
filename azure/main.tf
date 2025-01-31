@@ -503,7 +503,9 @@ for i in $(seq 0 $(($${#private_ips[@]} - 1))); do
 done
 
 sleep 50
-./driver.sh config.yml
+
+echo "Switching to ${var.default_ssh_user} and running driver.sh..."
+su - ${var.default_ssh_user} -c "cd /home/${var.default_ssh_user} && ./driver.sh config.yml"
 EOF
 )
 }
