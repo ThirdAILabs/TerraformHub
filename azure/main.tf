@@ -159,13 +159,20 @@ resource "azurerm_postgresql_flexible_server" "main" {
   administrator_login = var.rds_master_username
   administrator_password = var.rds_master_password
   public_network_access_enabled = false
-  sku_name            = "B_Standard_B1ms"
+  sku_name            = "Standard_B1ms"
   storage_mb          = var.rds_storage_size_gb * 1024
   version             = "14"
   storage_tier = "P4"
 
   delegated_subnet_id = azurerm_subnet.postgresql.id
   private_dns_zone_id       = azurerm_private_dns_zone.postgresql.id
+
+  backup_retention_days         = var.rds_backup_retention_days
+  geo_redundant_backup_enabled  = false
+
+  create_mode = var.restore_from_server_id != "" ? "PointInTimeRestore" : "Default"
+  source_server_id = var.restore_from_server_id != "" ? var.restore_from_server_id : null
+  point_in_time_restore_time_in_utc = var.restore_from_server_id != "" ? var.restore_point_in_time : null
 
   lifecycle {
       ignore_changes = [
@@ -177,6 +184,7 @@ resource "azurerm_postgresql_flexible_server" "main" {
 }
 
 resource "azurerm_postgresql_flexible_server_database" "modelbazaar" {
+  count     = var.restore_mode ? 0 : 1
   name                = "modelbazaar"
   server_id         = azurerm_postgresql_flexible_server.main.id
   collation = "en_US.utf8"
@@ -185,6 +193,7 @@ resource "azurerm_postgresql_flexible_server_database" "modelbazaar" {
 }
 
 resource "azurerm_postgresql_flexible_server_database" "grafana" {
+  count     = var.restore_mode ? 0 : 1
   name                = "grafana"
   server_id         = azurerm_postgresql_flexible_server.main.id
   collation = "en_US.utf8"
@@ -193,6 +202,7 @@ resource "azurerm_postgresql_flexible_server_database" "grafana" {
 }
 
 resource "azurerm_postgresql_flexible_server_database" "keycloak" {
+  count     = var.restore_mode ? 0 : 1
   name                = "keycloak"
   server_id         = azurerm_postgresql_flexible_server.main.id
   collation = "en_US.utf8"
@@ -238,6 +248,53 @@ resource "azurerm_storage_account_network_rules" "main" {
   depends_on = [
     azurerm_storage_share.main,  # Ensure storage share is created first
   ]
+}
+
+resource "azurerm_recovery_services_vault" "backup_vault" {
+  name                = "thirdai-backup-vault-${random_string.unique_suffix.result}"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  sku                 = "Standard"
+}
+
+resource "azurerm_backup_policy_file_share" "backup_policy" {
+  name                = "thirdai-fileshare-backup-policy"
+  resource_group_name = azurerm_resource_group.main.name
+  recovery_vault_name = azurerm_recovery_services_vault.backup_vault.name
+  timezone            = "UTC"
+
+  backup {
+    frequency = "Daily"
+    time      = "23:00"
+  }
+
+  retention_daily {
+    count = 7
+  }
+}
+
+resource "azurerm_backup_protected_file_share" "protected_fileshare" {
+  resource_group_name = azurerm_resource_group.main.name
+  recovery_vault_name = azurerm_recovery_services_vault.backup_vault.name
+  backup_policy_id    = azurerm_backup_policy_file_share.backup_policy.id
+  source_resource_id  = azurerm_storage_share.main.id
+}
+
+resource "null_resource" "fileshare_restore" {
+  count = var.existing_recovery_point_id != "" ? 1 : 0
+
+  provisioner "local-exec" {
+    command = <<EOF
+az backup restore restore-azurefileshare \\
+  --resource-group "${azurerm_resource_group.main.name}" \\
+  --vault-name "${azurerm_recovery_services_vault.backup_vault.name}" \\
+  --container-name "${var.backup_container_name}" \\
+  --item-name "${azurerm_storage_share.main.name}" \\
+  --recovery-point-id "${var.existing_recovery_point_id}" \\
+  --target-storage-account "$(az storage account show --ids ${azurerm_storage_account.main.id} --query id --output tsv)" \\
+  --target-file-share "${var.target_file_share_name}"
+EOF
+  }
 }
 
 resource "azurerm_public_ip" "last_node" {
