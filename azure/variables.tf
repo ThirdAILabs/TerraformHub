@@ -113,3 +113,70 @@ variable "license_file_path" {
   description = "Path to the ThirdAI enterprise license file"
   type        = string
 }
+
+variable "source_image_publisher" {
+  description = "Publisher for the source image"
+  type        = string
+  default     = "Canonical"
+}
+
+variable "source_image_offer" {
+  description = "Offer for the source image"
+  type        = string
+  default     = "0001-com-ubuntu-server-jammy"
+}
+
+variable "source_image_sku" {
+  description = "SKU for the source image"
+  type        = string
+  default     = "22_04-lts"
+}
+
+variable "source_image_version" {
+  description = "Version for the source image"
+  type        = string
+  default     = "latest"
+}
+
+variable "vnet_address_space" {
+  description = "The address space for the virtual network"
+  type        = list(string)
+  default     = ["10.0.0.0/16"]
+}
+
+variable "postgresql_subnet_prefix" {
+  description = "Address prefix for the PostgreSQL subnet"
+  type        = string
+  default     = "10.0.1.0/24"
+}
+
+variable "vm_subnet_prefix" {
+  description = "Address prefix for the VM subnet"
+  type        = string
+  default     = "10.0.2.0/24"
+}
+
+variable "postgresql_sku" {
+  description = "SKU name for PostgreSQL Flexible Server"
+  type        = string
+  default     = "B_Standard_B1ms"
+}
+
+variable "postgresql_version" {
+  description = "PostgreSQL version to deploy"
+  type        = string
+  default     = "14"
+}
+
+variable "postgresql_storage_tier" {
+  description = "Storage tier for PostgreSQL Flexible Server"
+  type        = string
+  default     = "P4"
+}
+
+variable "nfs_share_quota" {
+  description = "Quota for the NFS share (in GB)"
+  type        = number
+  default     = 200
+}
+

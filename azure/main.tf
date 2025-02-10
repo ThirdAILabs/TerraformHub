@@ -39,14 +39,14 @@ resource "azurerm_virtual_network" "main" {
   name                = "thirdai-platform-vnet-${random_string.unique_suffix.result}"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
-  address_space       = ["10.0.0.0/16"]
+  address_space       = var.vnet_address_space
 }
 
 resource "azurerm_subnet" "postgresql" {
   name                 = "thirdai-platform-postgres-subnet"
   resource_group_name  = azurerm_resource_group.main.name
   virtual_network_name = azurerm_virtual_network.main.name
-  address_prefixes     = ["10.0.1.0/24"]
+  address_prefixes     = [var.postgresql_subnet_prefix]
   delegation {
     name = "postgreSQLDelegation"
     service_delegation {
@@ -67,7 +67,7 @@ resource "azurerm_subnet" "vm" {
   name                 = "thirdai-platform-vm-subnet"
   resource_group_name  = azurerm_resource_group.main.name
   virtual_network_name = azurerm_virtual_network.main.name
-  address_prefixes     = ["10.0.2.0/24"]
+  address_prefixes     = [var.vm_subnet_prefix]
   service_endpoints    = ["Microsoft.Sql", "Microsoft.Storage"]
 }
 
@@ -159,10 +159,10 @@ resource "azurerm_postgresql_flexible_server" "main" {
   administrator_login = var.rds_master_username
   administrator_password = var.rds_master_password
   public_network_access_enabled = false
-  sku_name            = "B_Standard_B1ms"
+  sku_name            = var.postgresql_sku
   storage_mb          = var.rds_storage_size_gb * 1024
-  version             = "14"
-  storage_tier = "P4"
+  version             = var.postgresql_version
+  storage_tier = var.postgresql_storage_tier
 
   delegated_subnet_id = azurerm_subnet.postgresql.id
   private_dns_zone_id       = azurerm_private_dns_zone.postgresql.id
@@ -215,7 +215,7 @@ resource "azurerm_storage_account" "main" {
 resource "azurerm_storage_share" "main" {
   name                 = "thirdai-platform-share"
   storage_account_name = azurerm_storage_account.main.name
-  quota                = 200 # Size in GB
+  quota                = var.nfs_share_quota # Size in GB
   enabled_protocol     = "NFS"
 
   depends_on = [
@@ -296,10 +296,10 @@ resource "azurerm_linux_virtual_machine" "worker_vms" {
   }
 
   source_image_reference {
-    publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts"
-    version   = "latest"
+    publisher = var.source_image_publisher
+    offer     = var.source_image_offer
+    sku       = var.source_image_sku
+    version   = var.source_image_version
   }
 
   custom_data = base64encode(<<EOF
@@ -369,10 +369,10 @@ resource "azurerm_linux_virtual_machine" "last_node" {
   }
 
   source_image_reference {
-    publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts"
-    version   = "latest"
+    publisher = var.source_image_publisher
+    offer     = var.source_image_offer
+    sku       = var.source_image_sku
+    version   = var.source_image_version
   }
 
 custom_data = base64encode(<<EOF
@@ -451,9 +451,9 @@ echo "Public IP: $last_node_public_ip"
 sed -i '/- name: \"node2\"/,$d' config.yml
 
 # Construct database connection URIs
-modelbazaar_db_uri="postgresql://${var.rds_master_username}:${var.rds_master_password}@${azurerm_postgresql_flexible_server.main.fqdn}/modelbazaar"
-keycloak_db_uri="postgresql://${var.rds_master_username}:${var.rds_master_password}@${azurerm_postgresql_flexible_server.main.fqdn}/keycloak"
-grafana_db_uri="postgres://${var.rds_master_username}:${var.rds_master_password}@${azurerm_postgresql_flexible_server.main.fqdn}/grafana?sslmode=require"
+modelbazaar_db_uri="postgresql://${var.rds_master_username}:${var.rds_master_password}@${azurerm_postgresql_flexible_server.main.fqdn}:5432/modelbazaar"
+keycloak_db_uri="postgresql://${var.rds_master_username}:${var.rds_master_password}@${azurerm_postgresql_flexible_server.main.fqdn}:5432/keycloak"
+grafana_db_uri="postgres://${var.rds_master_username}:${var.rds_master_password}@${azurerm_postgresql_flexible_server.main.fqdn}:5432/grafana?sslmode=require"
 
 echo "MODEL BAZAAR SQL URI: $modelbazaar_db_uri"
 echo "KEYCLOAK SQL URI: $keycloak_db_uri"
