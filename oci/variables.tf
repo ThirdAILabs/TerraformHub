@@ -58,3 +58,36 @@ variable "node_count" {
   type        = number
   default     = 2
 }
+
+variable "user_auth_method" {
+  description = "Authentication method for accessing resources"
+  type        = string
+  default     = "postgres"
+}
+
+variable "openai_api_key" {
+  description = "API Key for OpenAI GenAI integration"
+  type        = string
+  default     = ""
+}
+
+# Configuration variables for platform
+variable "platform_admin_email" {
+  description = "Admin email for configuring the platform"
+  type        = string
+}
+
+variable "platform_admin_username" {
+  description = "Admin username for configuring the platform"
+  type        = string
+}
+
+variable "platform_admin_password" {
+  description = "Admin password for configuring the platform"
+  type        = string
+}
+
+variable "platform_version" {
+  description = "Version of the ThirdAI platform to deploy"
+  type        = string
+}

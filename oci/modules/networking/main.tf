@@ -81,63 +81,7 @@ resource "oci_core_security_list" "security_list" {
     protocol = "6" # TCP
     source   = var.subnet_cidr
     tcp_options {
-      min = 22
-      max = 22
-    }
-  }
-  ingress_security_rules {
-    protocol = "6" # TCP
-    source   = var.subnet_cidr
-    tcp_options {
-      min = 80
-      max = 80
-    }
-  }
-  ingress_security_rules {
-    protocol = "6" # TCP
-    source   = var.subnet_cidr
-    tcp_options {
-      min = 443
-      max = 443
-    }
-  }
-  ingress_security_rules {
-    protocol = "6" # TCP
-    source   = var.subnet_cidr
-    tcp_options {
-      min = 2049
-      max = 2049
-    }
-  }
-  ingress_security_rules {
-    protocol = "6" # TCP
-    source   = var.subnet_cidr
-    tcp_options {
-      min = 4646
-      max = 4648
-    }
-  }
-  ingress_security_rules {
-    protocol = "6" # TCP
-    source   = var.subnet_cidr
-    tcp_options {
-      min = 5000
-      max = 5000
-    }
-  }
-  ingress_security_rules {
-    protocol = "6" # TCP
-    source   = var.subnet_cidr
-    tcp_options {
-      min = 5432
-      max = 5432
-    }
-  }
-  ingress_security_rules {
-    protocol = "6" # TCP
-    source   = var.subnet_cidr
-    tcp_options {
-      min = 20000
+      min = 1
       max = 32000
     }
   }

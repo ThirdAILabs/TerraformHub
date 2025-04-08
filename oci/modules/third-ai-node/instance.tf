@@ -1,8 +1,15 @@
+data "oci_core_images" "ubuntu" {
+  compartment_id = var.compartment_id
+  operating_system = "Canonical Ubuntu"
+  operating_system_version = "24.04"
+  shape = "VM.Standard3.Flex"
+}
+
 resource "oci_core_instance" "generated_oci_core_instance" {
   compartment_id      = var.compartment_id
   availability_domain = var.availability_domain
   display_name        = var.instance_name
-  shape               = "VM.Standard.E5.Flex"
+  shape               = "VM.Standard3.Flex"
 
   shape_config {
     ocpus         = 4
@@ -18,7 +25,7 @@ resource "oci_core_instance" "generated_oci_core_instance" {
 
   source_details {
     source_type             = "image"
-    source_id               = "ocid1.image.oc1.us-chicago-1.aaaaaaaaulk5wmw64opjanlveodijztcjlhrxr5zyvcbierrwhildef62pbq"
+    source_id               = data.oci_core_images.ubuntu.images[0].id
     boot_volume_size_in_gbs = 64
   }
 

@@ -7,14 +7,10 @@
 -A INPUT -p icmp -j ACCEPT
 -A INPUT -i lo -j ACCEPT
 -A INPUT -p udp --sport 123 -j ACCEPT
--A INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT
--A INPUT -p tcp -m state --state NEW -m tcp --dport 80 -j ACCEPT
--A INPUT -p tcp -m state --state NEW -m tcp --dport 443 -j ACCEPT
--A INPUT -p tcp -m state --state NEW -m tcp --dport 2049 -j ACCEPT
--A INPUT -p tcp -m state --state NEW -m tcp --dport 4646:4648 -j ACCEPT
--A INPUT -p tcp -m state --state NEW -m tcp --dport 5000 -j ACCEPT
--A INPUT -p tcp -m state --state NEW -m tcp --dport 5432 -j ACCEPT
--A INPUT -p tcp -m state --state NEW -m tcp --dport 20000:32000 -j ACCEPT
+-A INPUT -p tcp -m state --state NEW -m tcp --dport 1:32000 -j ACCEPT
+-A INPUT -i docker0 -p udp --dport 53 -j ACCEPT -m comment --comment "Allow DNS UDP from Docker (for systemd-resolved)"
+-A INPUT -i docker0 -p tcp --dport 53 -j ACCEPT -m comment --comment "Allow DNS TCP from Docker (for systemd-resolved)"
+-A INPUT -i docker0 -p udp --dport 8600 -j ACCEPT -m comment --comment "Allow Consul DNS UDP from Docker (Direct)"
 -A INPUT -j REJECT --reject-with icmp-host-prohibited
 -A FORWARD -j REJECT --reject-with icmp-host-prohibited
 -A OUTPUT -d 169.254.0.0/16 -j InstanceServices

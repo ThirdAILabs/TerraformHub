@@ -67,22 +67,4 @@ resource "null_resource" "setup_instance" {
     }
   }
 
-  provisioner "remote-exec" {
-    inline = [
-      "sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ubuntu-server nano netcat rsync inetutils-ping",
-      "wget https://thirdai-corp-public.s3.us-east-2.amazonaws.com/ThirdAI-Platform-latest-release/thirdai-platform-package-release-test-main-v0.0.77.tar.gz",
-      "tar xvzf thirdai-platform-package-release-test-main-v0.0.77.tar.gz",
-      "chmod +x /home/ubuntu/driver.sh",
-      "chmod 600 /home/ubuntu/.ssh/id_rsa",
-      "chmod 644 /home/ubuntu/.ssh/id_rsa.pub",
-      "cat /home/ubuntu/.ssh/id_rsa.pub >> /home/ubuntu/.ssh/authorized_keys"
-    ]
-
-    connection {
-      type        = "ssh"
-      user        = "ubuntu"
-      host        = oci_core_instance.generated_oci_core_instance.public_ip
-      private_key = file("~/.ssh/id_rsa")
-    }
-  }
 }
