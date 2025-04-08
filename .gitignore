@@ -3,3 +3,7 @@
 *.txt*
 
 *.tfstate*
+
+ndb_enterprise_license.json
+
+.DS_Store
